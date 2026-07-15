@@ -19,26 +19,16 @@ jobs:
     strategy:
       matrix:
         include:
-          # Framework-Dependent builds (requires .NET runtime on user machine)
+          # Framework-Dependent build (requires .NET runtime on user machine)
           - runner: windows-latest
             platform: x64
             arch: x64
             deployment: framework-dependent
             deploy_suffix: FD
-          - runner: windows-11-arm
-            platform: ARM64
-            arch: arm64
-            deployment: framework-dependent
-            deploy_suffix: FD
-          # Self-Contained builds (includes .NET runtime)
+          # Self-Contained build (includes .NET runtime)
           - runner: windows-latest
             platform: x64
             arch: x64
-            deployment: self-contained
-            deploy_suffix: SC
-          - runner: windows-11-arm
-            platform: ARM64
-            arch: arm64
             deployment: self-contained
             deploy_suffix: SC
     runs-on: ${{ matrix.runner }}
@@ -53,7 +43,7 @@ jobs:
       - name: (01) Checkout Repository
         uses: actions/checkout@v7
 
-        # 2. Auto-detect solution file (Supports legacy .sln modern VS2026 .slnx)
+      # 2. Auto-detect solution file (Supports legacy .sln & modern VS2026 .slnx)
       - name: (02) Find solution file
         shell: pwsh
         run: |
@@ -114,13 +104,13 @@ jobs:
         if: matrix.deployment == 'framework-dependent'
         shell: pwsh
         run: |
-          msbuild "$Env:GITHUB_WORKSPACE\$($sln.Name)" -p:Configuration="Release" -p:Platform=${{ matrix.platform }} /verbosity:minimal
+          msbuild "$Env:GITHUB_WORKSPACE\$Env:SOLUTION_FILE" -p:Configuration="Release" -p:Platform=${{ matrix.platform }} /verbosity:minimal
 
       - name: (08) Build Self-Contained Release
         if: matrix.deployment == 'self-contained'
         shell: pwsh
         run: |
-          msbuild "$Env:GITHUB_WORKSPACE\mRemoteNG.sln" /t:Publish /p:Configuration="Release Self-Contained" -p:Platform=${{ matrix.platform }} /verbosity:minimal /p:SelfContained=true /p:PublishDir="bin\${{ matrix.platform }}\Release"
+          msbuild "$Env:GITHUB_WORKSPACE\$Env:SOLUTION_FILE" /t:Publish /p:Configuration="Release Self-Contained" -p:Platform=${{ matrix.platform }} /verbosity:minimal /p:SelfContained=true /p:PublishDir="bin\${{ matrix.platform }}\Release"
                 
       - name: (09) Release Information
         id: version
@@ -268,7 +258,7 @@ jobs:
           }
 
       - name: Create combined release
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -290,7 +280,7 @@ jobs:
             - Includes .NET 10 runtime - no installation needed
             - Files: `*-SC.zip`
             
-            Both versions are available for **x64** and **ARM64** architectures.
+            Both versions are built for **x64** architectures.
             
             ---
             
