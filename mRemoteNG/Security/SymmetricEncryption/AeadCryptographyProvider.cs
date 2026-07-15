@@ -100,6 +100,38 @@ namespace mRemoteNG.Security.SymmetricEncryption
             return encryptedText;
         }
 
+        /// <summary>
+        /// Encrypts using an already-derived key, with no key derivation step.
+        /// </summary>
+        /// <remarks>
+        /// The password overloads derive a key per call from a per-ciphertext salt, so protecting a
+        /// connection file costs one KDF run per secret. Callers holding a master key use this instead:
+        /// derivation happens once for the file, which is what makes a slow, strong KDF affordable.
+        ///
+        /// The output has no salt, so it is NOT interchangeable with <see cref="Encrypt"/> output. The
+        /// reader must already know which form it is; the connection file records that per file.
+        /// </remarks>
+        public string EncryptWithKey(string plainText, byte[] key)
+        {
+            if (string.IsNullOrEmpty(plainText))
+                return "";
+
+            byte[] cipherText = SimpleEncrypt(_encoding.GetBytes(plainText), key);
+            return Convert.ToBase64String(cipherText);
+        }
+
+        /// <summary>
+        /// Decrypts output of <see cref="EncryptWithKey"/>.
+        /// </summary>
+        public string DecryptWithKey(string cipherText, byte[] key)
+        {
+            if (string.IsNullOrWhiteSpace(cipherText))
+                return "";
+
+            byte[] plainText = SimpleDecrypt(Convert.FromBase64String(cipherText), key);
+            return _encoding.GetString(plainText);
+        }
+
         private string SimpleEncryptWithPassword(string secretMessage, string password, byte[]? nonSecretPayload = null)
         {
             if (string.IsNullOrEmpty(secretMessage))
