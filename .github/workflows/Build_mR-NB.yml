@@ -42,6 +42,16 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'push' && contains(github.event.head_commit.message, 'NB release'))
 
+    # Published so Create-Combined-Release tags with the version that was actually built.
+    # It cannot re-derive it: the build number comes from the T4 transform, which only runs
+    # here, so reading the committed AssemblyInfo.cs there yields a stale build number.
+    # Both matrix legs transform within seconds of each other and so produce the same value.
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      build: ${{ steps.version.outputs.build }}
+      tag: ${{ steps.version.outputs.tag }}
+      message: ${{ steps.version.outputs.message }}
+
     steps:
       - name: (01) Checkout Repository
         uses: actions/checkout@v7
@@ -237,6 +247,10 @@ jobs:
   Create-Combined-Release:
     needs: NB-Build-and-Release
     runs-on: windows-latest
+    # Skipping this job is what makes a build-only run possible: dispatch with
+    # release_flag=false to compile and get the zips as workflow artifacts without
+    # publishing a release or creating a tag.
+    if: github.event_name != 'workflow_dispatch' || inputs.release_flag == 'true'
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v7
@@ -245,26 +259,6 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           path: artifacts
-
-      - name: Extract version info
-        id: version
-        shell: pwsh
-        run: |
-          $assemblyInfoPath = "${{ github.workspace }}\mRemoteNG\Properties\AssemblyInfo.cs"
-          $line = Get-Content $assemblyInfoPath | Where-Object { $_ -match 'AssemblyVersion\("(.+?)"\)' }
-          if ($line -match 'AssemblyVersion\("(?<ver>\d+\.\d+\.\d+)\.(?<build>\d+)"\)') {
-            $version = $matches['ver']
-            $build = $matches['build']
-          } else {
-            throw "Could not extract version and build number"
-          }
-          $date = Get-Date -Format "yyyyMMdd"
-          $tag = "$date-v$version-NB-($build)"
-          $message = git log -1 --pretty=%B
-          echo "version=$version" >> $env:GITHUB_OUTPUT
-          echo "build=$build" >> $env:GITHUB_OUTPUT
-          echo "tag=$tag" >> $env:GITHUB_OUTPUT
-          echo "message=$message" >> $env:GITHUB_OUTPUT
 
       - name: Extract Changelog
         id: changelog
@@ -311,11 +305,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: "mRemoteNG ${{ steps.version.outputs.version }} NB ${{ steps.version.outputs.build }}"
+          tag_name: ${{ needs.NB-Build-and-Release.outputs.tag }}
+          name: "mRemoteNG ${{ needs.NB-Build-and-Release.outputs.version }} NB ${{ needs.NB-Build-and-Release.outputs.build }}"
           files: '*.zip'
           body: |
-            ## mRemoteNG ${{ steps.version.outputs.version }} NB Build ${{ steps.version.outputs.build }}
+            ## mRemoteNG ${{ needs.NB-Build-and-Release.outputs.version }} NB Build ${{ needs.NB-Build-and-Release.outputs.build }}
             
             ### 📦 Available Downloads
             
@@ -337,7 +331,7 @@ jobs:
             ${{ steps.changelog.outputs.log }}
             
             ### 💬 Last Commit Message
-            ${{ steps.version.outputs.message }}
+            ${{ needs.NB-Build-and-Release.outputs.message }}
 
           draft: false
           prerelease: true
