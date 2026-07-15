@@ -109,6 +109,10 @@ jobs:
       - name: (06) Restore NuGet Packages
         shell: pwsh
         run: dotnet restore
+
+      # Add this new step right here:
+      - name: (06.5) Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
         
       - name: (07) Build Framework-Dependent Release
         if: matrix.deployment == 'framework-dependent'
