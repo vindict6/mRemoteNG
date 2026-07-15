@@ -171,6 +171,37 @@ jobs:
           $count = (Get-ChildItem $sourceDir -Recurse -File).Count
           Write-Host "Output OK: $sourceDir ($count files)" -ForegroundColor Green
 
+      # Runs on the framework-dependent leg only: it is the one that builds the whole solution, so
+      # mRemoteNGTests.dll is already compiled. vstest.console from the installed VS is used rather
+      # than `dotnet test`, because the .NET Core MSBuild cannot evaluate mRemoteNG.csproj at all
+      # (COMReference/MSB4803), even to work out where the test assembly is.
+      - name: (08.5) Run unit tests
+        if: matrix.deployment == 'framework-dependent'
+        shell: pwsh
+        run: |
+          $testDll = "$Env:GITHUB_WORKSPACE\mRemoteNGTests\bin\${{ matrix.platform }}\Release\mRemoteNGTests.dll"
+          if (-not (Test-Path $testDll)) {
+            Write-Host "ERROR: test assembly not found at $testDll" -ForegroundColor Red
+            Get-ChildItem "$Env:GITHUB_WORKSPACE\mRemoteNGTests\bin" -Recurse -Filter "*.dll" |
+              Select-Object -First 20 -ExpandProperty FullName
+            exit 1
+          }
+
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vsPath = & $vswhere -latest -products * -property installationPath
+          $vstest = Join-Path $vsPath "Common7\IDE\CommonExtensions\Microsoft\TestWindow\vstest.console.exe"
+          if (-not (Test-Path $vstest)) {
+            Write-Host "ERROR: vstest.console.exe not found at $vstest" -ForegroundColor Red
+            exit 1
+          }
+
+          Write-Host "Running tests from $testDll" -ForegroundColor Cyan
+          & $vstest $testDll /Platform:x64 /logger:console`;verbosity=minimal
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "ERROR: unit tests failed (exit $LASTEXITCODE)" -ForegroundColor Red
+            exit $LASTEXITCODE
+          }
+
       - name: (09) Release Information
         id: version
         shell: pwsh
