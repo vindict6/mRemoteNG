@@ -59,8 +59,20 @@ namespace mRemoteNG.UI.Forms.OptionsPages
             base.ApplyTheme();
         }
 
+        /// <summary>
+        /// Following the OS and choosing a theme by hand are mutually exclusive, so reflect that in the UI:
+        /// the theme list is only meaningful while the app is not tracking Windows.
+        /// </summary>
+        private void chkFollowOsTheme_CheckedChanged(object sender, EventArgs e)
+        {
+            cboTheme.Enabled = !chkFollowOsTheme.Checked;
+        }
+
         public override void LoadSettings()
         {
+            chkFollowOsTheme.Checked = Properties.OptionsThemePage.Default.FollowOsTheme;
+            cboTheme.Enabled = !chkFollowOsTheme.Checked;
+
             //At first we cannot create or delete themes, depends later on the type of selected theme
             btnThemeNew.Enabled = false;
             btnThemeDelete.Enabled = false;
@@ -91,16 +103,29 @@ namespace mRemoteNG.UI.Forms.OptionsPages
 
             Properties.OptionsThemePage.Default.ThemingActive = true;
 
+            // Whether to track Windows is resolved at startup, so a change here needs the same
+            // restart as picking a theme by hand does.
+            bool followOsChanged = Properties.OptionsThemePage.Default.FollowOsTheme != chkFollowOsTheme.Checked;
+            Properties.OptionsThemePage.Default.FollowOsTheme = chkFollowOsTheme.Checked;
+
             // Save the theme settings form close so we don't run into unexpected results while modifying...
             // Prompt the user that a restart is required to apply the new theme...
+            // While following the OS the theme list is disabled, so the selection cannot drift from
+            // the OS-matched theme that startup chose.
+            bool themeChanged = false;
             if (cboTheme.SelectedItem != null
             ) // LoadSettings calls SaveSettings, so these might be null the first time around
             {
                 if (!Properties.OptionsThemePage.Default.ThemeName.Equals(((ThemeInfo)cboTheme.SelectedItem).Name))
                 {
                     Properties.OptionsThemePage.Default.ThemeName = ((ThemeInfo)cboTheme.SelectedItem).Name;
-                    CTaskDialog.MessageBox("Theme Changed", "Restart Required.", "Please restart mRemoteNG to apply the selected theme.", ETaskDialogButtons.Ok, ESysIcons.Information);
+                    themeChanged = true;
                 }
+            }
+
+            if (themeChanged || followOsChanged)
+            {
+                CTaskDialog.MessageBox("Theme Changed", "Restart Required.", "Please restart mRemoteNG to apply the selected theme.", ETaskDialogButtons.Ok, ESysIcons.Information);
             }
 
             foreach (ThemeInfo updatedTheme in modifiedThemes)

@@ -15,6 +15,9 @@ namespace mRemoteNG.App
     {
         #region Functions
 
+        [DllImport("dwmapi.dll", PreserveSig = true)]
+        internal static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
         [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         internal static extern bool AppendMenu(IntPtr hMenu, int uFlags, IntPtr uIDNewItem, string lpNewItem);
 

@@ -25,7 +25,7 @@ namespace mRemoteNG.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
         public bool ThemingActive {
             get {
                 return ((bool)(this["ThemingActive"]));
@@ -56,6 +56,42 @@ namespace mRemoteNG.Properties {
             }
             set {
                 this["cbThemePageInOptionMenu"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool FollowOsTheme {
+            get {
+                return ((bool)(this["FollowOsTheme"]));
+            }
+            set {
+                this["FollowOsTheme"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("vs2015Dark")]
+        public string OsDarkThemeName {
+            get {
+                return ((string)(this["OsDarkThemeName"]));
+            }
+            set {
+                this["OsDarkThemeName"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("vs2015Light")]
+        public string OsLightThemeName {
+            get {
+                return ((string)(this["OsLightThemeName"]));
+            }
+            set {
+                this["OsLightThemeName"] = value;
             }
         }
     }

@@ -38,6 +38,7 @@ namespace mRemoteNG.UI.Forms.OptionsPages
             btnThemeDelete = new MrngButton();
             btnThemeNew = new MrngButton();
             cboTheme = new MrngComboBox();
+            chkFollowOsTheme = new MrngCheckBox();
             listPalette = new MrngListView();
             keyCol = new BrightIdeasSoftware.OLVColumn();
             ColorCol = new BrightIdeasSoftware.OLVColumn();
@@ -137,9 +138,22 @@ namespace mRemoteNG.UI.Forms.OptionsPages
             labelRestart.TabIndex = 4;
             labelRestart.Text = "Warning: Restart is required...";
             labelRestart.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
-            // 
+            //
+            // chkFollowOsTheme
+            //
+            chkFollowOsTheme.AutoSize = true;
+            chkFollowOsTheme.Dock = System.Windows.Forms.DockStyle.Fill;
+            chkFollowOsTheme.Location = new System.Drawing.Point(3, 37);
+            chkFollowOsTheme.Name = "chkFollowOsTheme";
+            chkFollowOsTheme.Size = new System.Drawing.Size(604, 22);
+            chkFollowOsTheme.TabIndex = 9;
+            chkFollowOsTheme.Text = "Match the Windows app theme (dark or light) at startup";
+            chkFollowOsTheme.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            chkFollowOsTheme.UseVisualStyleBackColor = true;
+            chkFollowOsTheme.CheckedChanged += chkFollowOsTheme_CheckedChanged;
+            //
             // tableLayoutPanel1
-            // 
+            //
             tableLayoutPanel1.ColumnCount = 3;
             tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
             tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 100F));
@@ -173,14 +187,16 @@ namespace mRemoteNG.UI.Forms.OptionsPages
             // 
             tlpMain.ColumnCount = 1;
             tlpMain.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            tlpMain.Controls.Add(tableLayoutPanel2, 0, 2);
             tlpMain.Controls.Add(tableLayoutPanel1, 0, 0);
-            tlpMain.Controls.Add(listPalette, 0, 1);
+            tlpMain.Controls.Add(chkFollowOsTheme, 0, 1);
+            tlpMain.Controls.Add(listPalette, 0, 2);
+            tlpMain.Controls.Add(tableLayoutPanel2, 0, 3);
             tlpMain.Dock = System.Windows.Forms.DockStyle.Fill;
             tlpMain.Location = new System.Drawing.Point(0, 0);
             tlpMain.Name = "tlpMain";
-            tlpMain.RowCount = 3;
+            tlpMain.RowCount = 4;
             tlpMain.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 34F));
+            tlpMain.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 28F));
             tlpMain.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
             tlpMain.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 34F));
             tlpMain.Size = new System.Drawing.Size(610, 490);
@@ -205,6 +221,7 @@ namespace mRemoteNG.UI.Forms.OptionsPages
         internal MrngButton btnThemeDelete;
         internal MrngButton btnThemeNew;
         internal MrngComboBox cboTheme;
+        internal MrngCheckBox chkFollowOsTheme;
         private Controls.MrngListView listPalette;
         private Controls.MrngLabel labelRestart;
         private BrightIdeasSoftware.OLVColumn keyCol;

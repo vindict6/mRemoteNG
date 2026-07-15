@@ -360,9 +360,21 @@ namespace mRemoteNG.UI.Forms
             toolsMenu.CredentialProviderCatalog = Runtime.CredentialProviderCatalog;
         }
 
+        // ApplyTheme runs from the constructor, before the handle exists, and the caption can only be
+        // restyled once there is a window to address.
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            WindowTitleBarTheme.Apply(this);
+        }
+
         //Theming support
         private void ApplyTheme()
         {
+            // The title bar is drawn by the shell, so it is outside the palette and has to be set
+            // explicitly for both the themed and unthemed cases.
+            WindowTitleBarTheme.Apply(this);
+
             if (!_themeManager.ThemingActive)
             {
                 pnlDock.Theme = _themeManager.DefaultTheme.Theme;

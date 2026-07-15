@@ -36,11 +36,13 @@ namespace mRemoteNG.Themes
         {
             LoadThemes();
             SetActive();
-            _themeActive = true;
+            _themeActive = Properties.OptionsThemePage.Default.ThemingActive;
         }
 
         private void SetActive()
         {
+            if (SetActiveFromOsTheme()) return;
+
             if (themes[Properties.OptionsThemePage.Default.ThemeName] is ThemeInfo savedTheme)
                 ActiveTheme = savedTheme;
             else
@@ -54,6 +56,34 @@ namespace mRemoteNG.Themes
                 Properties.OptionsThemePage.Default.ThemeName = "";
                 Properties.OptionsThemePage.Default.Save();
             }
+        }
+
+        /// <summary>
+        /// Selects the theme matching the current Windows app mode when the user has opted to follow the OS.
+        /// </summary>
+        /// <returns>True when an OS-matched theme was selected and no further resolution is needed.</returns>
+        /// <remarks>
+        /// Only consulted at startup. DockPanelSuite refuses to re-theme a DockPanel that already holds
+        /// content (ThemeBase.ApplyTo throws), so reacting to a live OS switch would need every pane and
+        /// connection closed. See the restart prompt in ThemePage.SaveSettings.
+        /// </remarks>
+        private bool SetActiveFromOsTheme()
+        {
+            if (!Properties.OptionsThemePage.Default.FollowOsTheme) return false;
+
+            string osThemeName = OsThemeDetector.IsOsInDarkMode()
+                ? Properties.OptionsThemePage.Default.OsDarkThemeName
+                : Properties.OptionsThemePage.Default.OsLightThemeName;
+
+            if (string.IsNullOrEmpty(osThemeName) || themes[osThemeName] is not ThemeInfo osTheme)
+            {
+                // Configured theme is missing (deleted, or a bad settings value); fall back to normal resolution.
+                Debug.WriteLine($"Could not find OS-matched theme '{osThemeName}'. Falling back to the saved theme.");
+                return false;
+            }
+
+            ActiveTheme = osTheme;
+            return true;
         }
 
         #endregion

@@ -84,8 +84,10 @@ namespace mRemoteNG.UI.Forms
             btnOK.Text = Language._Ok;
             btnCancel.Text = Language._Cancel;
             btnApply.Text = Language.Apply;
-            //ApplyTheme();
-            //ThemeManager.getInstance().ThemeChanged += ApplyTheme;
+            // The pages theme themselves from their own constructors; this themes the form chrome
+            // around them, which otherwise stayed light and framed a dark page.
+            ApplyTheme();
+            ThemeManager.getInstance().ThemeChanged += ApplyTheme;
             lstOptionPages.SelectedIndexChanged += LstOptionPages_SelectedIndexChanged;
             lstOptionPages.SelectedIndex = 0;
             Logger.Instance.Log?.Debug($"[FrmOptions_Load] Selected index set to 0");
@@ -116,9 +118,33 @@ namespace mRemoteNG.UI.Forms
 
         private void ApplyTheme()
         {
+            // FrmMain.RecreateOptionsForm disposes this form and builds a new one, so a subscription
+            // can outlive the instance it belongs to. Drop it rather than touch a disposed form.
+            if (IsDisposed || Disposing)
+            {
+                ThemeManager.getInstance().ThemeChanged -= ApplyTheme;
+                return;
+            }
+
+            // The title bar is drawn by the shell and is not part of the palette.
+            WindowTitleBarTheme.Apply(this);
+
             if (!ThemeManager.getInstance().ActiveAndExtended) return;
             BackColor = ThemeManager.getInstance().ActiveTheme.ExtendedPalette.getColor("Dialog_Background");
             ForeColor = ThemeManager.getInstance().ActiveTheme.ExtendedPalette.getColor("Dialog_Foreground");
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            // The caption can only be restyled once there is a window to address.
+            WindowTitleBarTheme.Apply(this);
+        }
+
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            ThemeManager.getInstance().ThemeChanged -= ApplyTheme;
+            base.OnFormClosed(e);
         }
 
 #if false
