@@ -13,15 +13,16 @@ permissions:
 jobs:
   NB-Build-and-Release:
     strategy:
+      fail-fast: false
       matrix:
         include:
-          # Framework-Dependent build (requires .NET runtime on user machine)
+          # Framework-Dependent builds (requires .NET runtime on user machine)
           - runner: windows-latest
             platform: x64
             arch: x64
             deployment: framework-dependent
             deploy_suffix: FD
-          # Self-Contained build (includes .NET runtime)
+          # Self-Contained builds (includes .NET runtime)
           - runner: windows-latest
             platform: x64
             arch: x64
