@@ -22,12 +22,18 @@ jobs:
             arch: x64
             deployment: framework-dependent
             deploy_suffix: FD
+            configuration: Release
+            # OutputPath from mRemoteNG.csproj for 'Release|x64'
+            output_dir: Release
           # Self-Contained builds (includes .NET runtime)
           - runner: windows-latest
             platform: x64
             arch: x64
             deployment: self-contained
             deploy_suffix: SC
+            configuration: Release Self-Contained
+            # PublishDir from mRemoteNG.csproj for 'Release Self-Contained|x64'
+            output_dir: Publish Self-Contained
     runs-on: ${{ matrix.runner }}
     # Only run if:
     # - manual dispatch, OR
@@ -57,19 +63,16 @@ jobs:
             exit 1
           }
 
-      - name: (02) Install .NET 10 SDK
+      - name: (03) Install .NET 10 SDK
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
-      # 6. Install Visual Studio 2026 Build Tools
-      - name: (03) Install Visual Studio 2026 Build Tools
-        shell: pwsh
-        run: |
-          Write-Host "Installing VS 2026 Build Tools..."
-          choco install visualstudio2026buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 --includeRecommended --quiet" -y --ignore-package-exit-codes=3010
-          Write-Host "VS 2026 Build Tools installation completed"
-          
+      # AssemblyInfo.cs is generated here rather than during the build: the csproj's
+      # TransformOnBuild support lives in the VS-only TextTemplating targets, which are
+      # not present on a dotnet-SDK-only build. AssemblyInfo.ttinclude resolves the
+      # platform from the PLATFORM env var and loads Microsoft.VisualStudio.Interop.dll
+      # from mRemoteNG\libs, so no Visual Studio install is required.
       - name: (04) Install and run dotnet-t4 to transform T4 templates
         shell: pwsh
         run: |
@@ -77,26 +80,20 @@ jobs:
           # Refresh PATH to include global tools
           $env:PATH += ";$env:USERPROFILE\.dotnet\tools"
           $ttFile = "$env:GITHUB_WORKSPACE\mRemoteNG\Properties\AssemblyInfo.tt"
-          
-          Write-Host "Locating required Visual Studio assemblies..."
-          $searchPaths = @("C:\Program Files\Microsoft Visual Studio", "C:\Program Files (x86)\Microsoft Visual Studio")
-          
-          $envDte = Get-ChildItem -Path $searchPaths -Filter "EnvDTE.dll" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-          $interop = Get-ChildItem -Path $searchPaths -Filter "Microsoft.VisualStudio.Interop.dll" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-          
-          if (-not $envDte -or -not $interop) {
-            Write-Host "ERROR: Could not find EnvDTE.dll or Microsoft.VisualStudio.Interop.dll in the Visual Studio directories!" -ForegroundColor Red
+
+          Write-Host "Transforming T4 template..."
+          t4 $ttFile -p:platformType=${{ matrix.platform }}
+
+          $generated = "$env:GITHUB_WORKSPACE\mRemoteNG\Properties\AssemblyInfo.cs"
+          if (-not (Test-Path $generated)) {
+            Write-Host "ERROR: T4 transform did not produce AssemblyInfo.cs!" -ForegroundColor Red
             exit 1
           }
-          
-          Write-Host "Found EnvDTE at: $($envDte.FullName)" -ForegroundColor Green
-          Write-Host "Found Interop at: $($interop.FullName)" -ForegroundColor Green
-          
-          Write-Host "Transforming T4 template..."
-          t4 $ttFile -P platformType=${{ matrix.platform }} -r:"$($envDte.FullName)" -r:"$($interop.FullName)"
+          Write-Host "--- Generated AssemblyInfo.cs ---" -ForegroundColor Green
+          Get-Content $generated | Select-String -Pattern 'AssemblyVersion|AssemblyConfiguration'
         env:
           PLATFORM: '${{ matrix.platform }}'
-  
+
       - name: (05) Cache NuGet Packages
         uses: actions/cache@v6
         with:
@@ -108,24 +105,62 @@ jobs:
             
       - name: (06) Restore NuGet Packages
         shell: pwsh
-        run: dotnet restore
+        run: |
+          dotnet restore "$Env:GITHUB_WORKSPACE\$Env:SOLUTION_FILE" `
+            -p:Configuration="${{ matrix.configuration }}" `
+            -p:Platform=${{ matrix.platform }}
 
-      # Add this new step right here:
+      # Resolves the MSBuild from the Visual Studio 2026 install that is already present on the
+      # windows-latest image. mRemoteNG.csproj has a COMReference (MSTSCLib/aximp), and the
+      # ResolveComReference task only exists in the .NET Framework build of MSBuild, so
+      # `dotnet build` cannot build this solution (MSB4803).
       - name: (06.5) Setup MSBuild
         uses: microsoft/setup-msbuild@v2
-        
-      - name: (07) Build Framework-Dependent Release
-        if: matrix.deployment == 'framework-dependent'
-        shell: pwsh
-        run: |
-          msbuild "$Env:GITHUB_WORKSPACE\$Env:SOLUTION_FILE" -p:Configuration="Release" -p:Platform=${{ matrix.platform }} /verbosity:minimal
 
-      - name: (08) Build Self-Contained Release
-        if: matrix.deployment == 'self-contained'
+      # 'Release Self-Contained' needs no explicit Publish target: the csproj's PublishAfterBuild
+      # target runs Publish after Build and then deletes the intermediate build dir, leaving the
+      # artifact in PublishDir. TransformOnBuild is disabled so the AssemblyInfo.cs generated with
+      # the correct platform in step (04) is not overwritten by an in-build transform.
+      #
+      # Self-contained builds the mRemoteNG project rather than the solution: PublishAfterBuild
+      # deletes mRemoteNG's own output dir, and mRemoteNGTests references mRemoteNG, so a solution
+      # build races it and fails with MSB3030 (mRemoteNG.dll not found). Framework-dependent has no
+      # such target and builds the whole solution, which also compiles the test project.
+      - name: (07) Build ${{ matrix.deployment }} Release
         shell: pwsh
         run: |
-          msbuild "$Env:GITHUB_WORKSPACE\$Env:SOLUTION_FILE" /t:Publish /p:Configuration="Release Self-Contained" -p:Platform=${{ matrix.platform }} /verbosity:minimal /p:SelfContained=true /p:PublishDir="bin\${{ matrix.platform }}\Release"
-                
+          if ('${{ matrix.deployment }}' -eq 'self-contained') {
+            $target = "$Env:GITHUB_WORKSPACE\mRemoteNG\mRemoteNG.csproj"
+          } else {
+            $target = "$Env:GITHUB_WORKSPACE\$Env:SOLUTION_FILE"
+          }
+          Write-Host "Building: $target" -ForegroundColor Cyan
+
+          msbuild "$target" `
+            /restore `
+            -p:Configuration="${{ matrix.configuration }}" `
+            -p:Platform=${{ matrix.platform }} `
+            -p:TransformOnBuild=false `
+            /verbosity:minimal
+
+      - name: (08) Verify build output
+        shell: pwsh
+        run: |
+          $sourceDir = "$Env:GITHUB_WORKSPACE\mRemoteNG\bin\${{ matrix.platform }}\${{ matrix.output_dir }}"
+          if (-not (Test-Path $sourceDir)) {
+            Write-Host "ERROR: Expected output directory not found: $sourceDir" -ForegroundColor Red
+            Write-Host "Contents of mRemoteNG\bin:" -ForegroundColor Yellow
+            Get-ChildItem "$Env:GITHUB_WORKSPACE\mRemoteNG\bin" -Recurse -Directory | Select-Object -ExpandProperty FullName
+            exit 1
+          }
+          if (-not (Test-Path "$sourceDir\mRemoteNG.exe")) {
+            Write-Host "ERROR: mRemoteNG.exe not found in $sourceDir" -ForegroundColor Red
+            Get-ChildItem $sourceDir | Select-Object -First 40 -ExpandProperty Name
+            exit 1
+          }
+          $count = (Get-ChildItem $sourceDir -Recurse -File).Count
+          Write-Host "Output OK: $sourceDir ($count files)" -ForegroundColor Green
+
       - name: (09) Release Information
         id: version
         shell: pwsh
@@ -184,7 +219,7 @@ jobs:
       - name: (11) Create Zip File
         shell: pwsh
         run: |
-          $sourceDir = "$Env:GITHUB_WORKSPACE\mRemoteNG\bin\${{ matrix.platform }}\Release"
+          $sourceDir = "$Env:GITHUB_WORKSPACE\mRemoteNG\bin\${{ matrix.platform }}\${{ matrix.output_dir }}"
           Compress-Archive -Path "$sourceDir\*" -DestinationPath ${{ steps.version.outputs.zipname }}
           echo "File: ${{ steps.version.outputs.zipname }}"
           
@@ -192,7 +227,7 @@ jobs:
           $fileSize = (Get-Item ${{ steps.version.outputs.zipname }}).Length / 1MB
           echo "Size: $([math]::Round($fileSize, 2)) MB"
 
-      - name: (10) Upload artifacts for combination
+      - name: (12) Upload artifacts for combination
         uses: actions/upload-artifact@v7
         with:
           name: release-${{ matrix.arch }}-${{ matrix.deploy_suffix }}
