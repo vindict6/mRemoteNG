@@ -185,11 +185,20 @@ jobs:
           $vi = (Get-Item "artifact\PuTTYNG.exe").VersionInfo
           $hash = (Get-FileHash "artifact\PuTTYNG.exe" -Algorithm SHA256).Hash
 
-          # mRemoteNG's PuttyTypeDetector keys off InternalName containing "PuTTYNG", and treats a
-          # plain PuTTY differently (it starts it minimised and expects window borders). A binary
-          # that failed this check would be mis-detected at runtime rather than at build time.
+          # ProductVersion is the check that means something here. It proves the version.h patch
+          # landed, and therefore that this is a build of the requested tag rather than of whatever
+          # master happened to be.
+          #
+          # Note InternalName stays "PuTTY": upstream never renames it, so PuttyTypeDetector.IsPuttyNg
+          # (InternalName.Contains("PuTTYNG")) does not match the shipped binary and never has. That is
+          # pre-existing behaviour and is left alone here; this build matches the committed 0.83
+          # binary field for field, so detection behaves exactly as it does today.
           if ($vi.ProductVersion -notmatch 'mRemoteNG') {
             Write-Host "ERROR: version resource does not identify an mRemoteNG build: $($vi.ProductVersion)" -ForegroundColor Red
+            exit 1
+          }
+          if ($vi.ProductVersion -notmatch [regex]::Escape("${{ inputs.putty_tag }}")) {
+            Write-Host "ERROR: built binary is not the requested tag: $($vi.ProductVersion)" -ForegroundColor Red
             exit 1
           }
 
