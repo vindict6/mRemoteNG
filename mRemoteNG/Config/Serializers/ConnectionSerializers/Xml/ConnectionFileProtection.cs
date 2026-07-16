@@ -31,6 +31,23 @@ namespace mRemoteNG.Config.Serializers.ConnectionSerializers.Xml
         public const string Passphrase = "Passphrase";
 
         /// <summary>
+        /// Base64 salt for the export's key derivation. Fresh per export, so exporting the same
+        /// connections twice with the same passphrase still yields two files with different keys.
+        /// </summary>
+        public const string KdfSaltAttributeName = "KdfSalt";
+
+        /// <summary>
+        /// Argon2 memory cost in KiB, recorded so a future change of defaults cannot strand an
+        /// existing export: the importer derives with the parameters the file was written with.
+        /// </summary>
+        public const string KdfMemoryAttributeName = "KdfMemoryKb";
+
+        /// <summary>
+        /// Argon2 parallelism, recorded for the same reason as <see cref="KdfMemoryAttributeName"/>.
+        /// </summary>
+        public const string KdfParallelismAttributeName = "KdfParallelism";
+
+        /// <summary>
         /// Absent attribute: the historical scheme, where every secret is derived from the file password
         /// (by default the well-known "mR3m"). Still read so existing and third-party files keep opening.
         /// </summary>
